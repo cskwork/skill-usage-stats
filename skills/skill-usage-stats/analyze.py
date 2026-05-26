@@ -437,9 +437,11 @@ def canonical_name(name: str) -> str:
 def recommend(count: int, days_since: int, mtime_days: int) -> tuple[str, str]:
     """Return (verdict, reason). verdict in {KEEP, REVIEW, DELETE}."""
     if count == 0:
+        if mtime_days <= 30:
+            return ("KEEP", f"recently installed ({mtime_days}d ago); likely intentional")
         if mtime_days > 60:
             return ("DELETE", f"never used; installed {mtime_days}d ago")
-        return ("REVIEW", f"never used yet; recently installed ({mtime_days}d ago)")
+        return ("REVIEW", f"never used; installed {mtime_days}d ago")
     if days_since < 0:
         return ("REVIEW", "no last-used timestamp")
     if days_since <= 30:
