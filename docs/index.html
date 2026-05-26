@@ -1032,11 +1032,12 @@
       <div class="archive-grid">
         <div class="archive-prose">
           <p>
-            <code>skill-cleanup</code> never deletes skills. It moves each archived
-            skill directory under
-            <code>~/.claude/skills-archive/&lt;source&gt;/&lt;name&gt;/</code> and
-            renames <code>SKILL.md</code> to <code>SKILL.md.archived</code>. Because
-            the Claude Code harness discovers skills only by locating
+            <code>skill-cleanup</code> never deletes skills. Claude Code skills are
+            moved under <code>~/.claude/skills-archive/&lt;source&gt;/&lt;name&gt;/</code>
+            and Codex skills under
+            <code>~/.codex/skills-archive/&lt;source&gt;/&lt;name&gt;/</code>; either way
+            <code>SKILL.md</code> is renamed to <code>SKILL.md.archived</code>.
+            Because the harness discovers skills only by locating
             <code>SKILL.md</code>, the renamed file stops being auto-loaded while
             every other file remains intact and recoverable.
           </p>
