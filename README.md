@@ -111,6 +111,7 @@ python3 ~/.claude/skills/skill-cleanup/archive.py restore <skill-name>
 
 - **Never deletes**. Skills are moved under `~/.claude/skills-archive/<source>/<name>/` (or `~/.codex/skills-archive/...`).
 - **Renames `SKILL.md` → `SKILL.md.archived`** inside the archived directory. Since the harness only auto-discovers `SKILL.md`, the agent loses access to that skill, but every file is recoverable.
+- **Single-file prompts** (e.g. `~/.codex/prompts/<name>.md`) are wrapped in a `<source>/<stem>/` directory with the file renamed to `<name>.md.archived`, keeping the same restore semantics as directory-based skills.
 - Writes `.archived-meta.json` next to each archived skill with the original path, archive date, and stats-report reason.
 - Refuses to operate on `~/.claude/plugins/cache/...` — those are managed by the marketplace and would be re-installed.
 - Restore is a single command; the dry-run mode lets you preview every move before committing.
