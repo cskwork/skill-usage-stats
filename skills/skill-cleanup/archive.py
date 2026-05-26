@@ -72,6 +72,8 @@ def collect_candidates(
 
 def archive_one(item: dict, dry_run: bool) -> tuple[bool, str]:
     src_path: Path = item["path"]
+    if src_path.is_symlink():
+        return (False, f"symlink (not archiving): {src_path} -> {src_path.readlink()}")
     skill_md = src_path / "SKILL.md"
     if not skill_md.exists():
         return (False, f"no SKILL.md in {src_path}")
