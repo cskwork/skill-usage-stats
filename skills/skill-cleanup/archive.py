@@ -70,10 +70,48 @@ def collect_candidates(
     return chosen
 
 
+def _meta(item: dict, src_path: Path, extra: dict | None = None) -> dict:
+    meta = {
+        "original_path": str(src_path),
+        "archived_at": datetime.now().isoformat(timespec="seconds"),
+        "source": item["source"],
+        "verdict": item["verdict"],
+        "reason": item["reason"],
+        "count_at_archive": item["count"],
+        "days_since_at_archive": item["days_since"],
+    }
+    if extra:
+        meta.update(extra)
+    return meta
+
+
+def _archive_single_file(item: dict, src_path: Path, dry_run: bool) -> tuple[bool, str]:
+    """Archive a single-file skill (e.g. ~/.codex/prompts/<name>.md).
+
+    Wraps the file in a directory so the archive layout matches directory skills:
+        <archive_root>/<source>/<stem>/<name>.md.archived
+        <archive_root>/<source>/<stem>/.archived-meta.json
+    """
+    name = src_path.stem
+    dest_dir = archive_root(item["source"]) / item["source"] / name
+    archived_file = dest_dir / f"{src_path.name}.archived"
+    if dest_dir.exists():
+        return (False, f"archive target exists: {dest_dir}")
+    if dry_run:
+        return (True, f"[dry-run] move {src_path}  ->  {archived_file}")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src_path), str(archived_file))
+    meta = _meta(item, src_path, {"kind": "single-file", "archived_filename": f"{src_path.name}.archived"})
+    (dest_dir / ".archived-meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
+    return (True, f"archived {src_path.name} -> {archived_file}")
+
+
 def archive_one(item: dict, dry_run: bool) -> tuple[bool, str]:
     src_path: Path = item["path"]
     if src_path.is_symlink():
         return (False, f"symlink (not archiving): {src_path} -> {src_path.readlink()}")
+    if src_path.is_file() and src_path.suffix == ".md":
+        return _archive_single_file(item, src_path, dry_run)
     skill_md = src_path / "SKILL.md"
     if not skill_md.exists():
         return (False, f"no SKILL.md in {src_path}")
@@ -86,15 +124,7 @@ def archive_one(item: dict, dry_run: bool) -> tuple[bool, str]:
     dest_root.mkdir(parents=True, exist_ok=True)
     shutil.move(str(src_path), str(dest))
     (dest / "SKILL.md").rename(dest / "SKILL.md.archived")
-    meta = {
-        "original_path": str(src_path),
-        "archived_at": datetime.now().isoformat(timespec="seconds"),
-        "source": item["source"],
-        "verdict": item["verdict"],
-        "reason": item["reason"],
-        "count_at_archive": item["count"],
-        "days_since_at_archive": item["days_since"],
-    }
+    meta = _meta(item, src_path)
     (dest / ".archived-meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
     return (True, f"archived {src_path.name} -> {dest}")
 
@@ -155,7 +185,22 @@ def cmd_restore(args) -> int:
     if original.exists():
         print(f"original path already exists: {original}", file=sys.stderr)
         return 3
-    # rename SKILL.md.archived back, drop meta, move
+    # single-file archive: move <name>.md.archived back to its original path
+    if meta.get("kind") == "single-file":
+        archived_file = archived_dir / meta.get("archived_filename", "")
+        if not archived_file.exists():
+            print(f"missing archived file: {archived_file}", file=sys.stderr)
+            return 4
+        original.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(archived_file), str(original))
+        meta_path.unlink()
+        try:
+            archived_dir.rmdir()
+        except OSError:
+            pass
+        print(f"restored {archived_dir.name} -> {original}")
+        return 0
+    # standard directory archive: rename SKILL.md.archived back, drop meta, move
     skill_archived = archived_dir / "SKILL.md.archived"
     if skill_archived.exists():
         skill_archived.rename(archived_dir / "SKILL.md")
