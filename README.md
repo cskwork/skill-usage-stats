@@ -79,8 +79,8 @@ The `verdict` column auto-classifies each skill as **KEEP / REVIEW / DELETE** wi
 
 | Verdict | Rule |
 |---|---|
-| `KEEP` | count > 0 and last used ≤ 90 days |
-| `REVIEW` | never used but installed ≤ 60 days, or used long ago (≤ 180 days) |
+| `KEEP` | count > 0 and last used ≤ 90 days, **or** never used but installed ≤ 30 days (recent install, likely intentional) |
+| `REVIEW` | never used but installed 31–60 days ago, or used long ago (≤ 180 days) |
 | `DELETE` | never used and installed > 60 days, or last used > 180 days |
 
 Use the filters at the top of the dashboard (only KEEP / REVIEW / DELETE, only zero-use, only stale) to drill into a decision view.
