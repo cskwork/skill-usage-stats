@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>skill-usage-stats — Claude Code skill audit tool</title>
+  <meta name="description" content="Scan your Claude Code and Codex transcripts to see which skills you actually use. Generate an interactive HTML dashboard with KEEP/REVIEW/DELETE verdicts. Stdlib-only Python, offline, MIT licensed.">
+  <meta property="og:title" content="skill-usage-stats">
+  <meta property="og:description" content="Audit your Claude Code skill catalog. See which skills you actually use, when you last used them, and which can be archived.">
+  <meta property="og:image" content="og.png">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://cskwork.github.io/skill-usage-stats/">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    /* ─── CSS Variables ─────────────────────────────────────────── */
+    :root {
+      --bg:          #0f1115;
+      --bg-elevated: #161b22;
+      --bg-card:     #1a1f2e;
+      --bg-code:     #11131a;
+      --border:      #21262d;
+      --border-dim:  #1a1f2a;
+      --text:        #e6e6e6;
+      --text-dim:    #8b949e;
+      --text-muted:  #4a5568;
+      --accent:      #7aa2f7;
+      --accent-dim:  #3d5a9e;
+      --accent-glow: rgba(122, 162, 247, 0.12);
+      --green:       #9ece6a;
+      --yellow:      #e0af68;
+      --red:         #f7768e;
+      --purple:      #bb9af7;
+      --cyan:        #7dcfff;
+      --font-sans:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono:   "SF Mono", Monaco, Menlo, Consolas, monospace;
+      --radius:      6px;
+      --radius-lg:   10px;
+      --transition:  0.18s ease;
+      --max-w:       900px;
+    }
+
+    /* ─── Reset & Base ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── Layout ─────────────────────────────────────────────────── */
+    .wrap {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    section {
+      padding: 72px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    section:first-of-type { border-top: none; }
+
+    /* ─── Typography ─────────────────────────────────────────────── */
+    h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      color: var(--text);
+    }
+
+    h2 {
+      font-size: clamp(18px, 3vw, 22px);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    p { color: var(--text-dim); max-width: 68ch; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      background: var(--bg-code);
+      color: var(--cyan);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    strong { color: var(--text); font-weight: 600; }
+
+    /* ─── Nav ────────────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(15, 17, 21, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-brand {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+
+    .nav-brand span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 13px;
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    /* ─── Hero ───────────────────────────────────────────────────── */
+    .hero {
+      padding: 96px 0 72px;
+      border-top: none;
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hero-eyebrow::before {
+      content: "";
+      display: inline-block;
+      width: 24px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    .hero-tagline {
+      font-size: clamp(15px, 2.2vw, 18px);
+      color: var(--text-dim);
+      margin-top: 16px;
+      max-width: 56ch;
+      line-height: 1.6;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 12px;
+      margin-top: 36px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 20px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0a0e14;
+      border: 1px solid var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: #8db4ff;
+      border-color: #8db4ff;
+      text-decoration: none;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-elevated);
+      border-color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    .hero-meta {
+      margin-top: 48px;
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .hero-meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .hero-meta-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .hero-meta-value {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* ─── Problem section ────────────────────────────────────────── */
+    .problem p {
+      font-size: 16px;
+      line-height: 1.75;
+      max-width: 66ch;
+    }
+
+    /* ─── Table ──────────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 24px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+
+    thead { background: var(--bg-card); }
+
+    th {
+      text-align: left;
+      padding: 11px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border-dim);
+      vertical-align: top;
+      color: var(--text-dim);
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.015); }
+
+    td:first-child {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    /* Pattern column — wide, wraps */
+    td.pattern {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--cyan);
+      word-break: break-word;
+      min-width: 220px;
+    }
+
+    /* ─── Dashboard preview ──────────────────────────────────────── */
+    .dashboard-preview {
+      margin-top: 28px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .dashboard-topbar {
+      background: var(--bg-card);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dashboard-topbar-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    .filter-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      background: var(--bg-elevated);
+    }
+
+    .filter-pill.active {
+      border-color: var(--accent-dim);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .dash-table-wrap { overflow-x: auto; }
+
+    .dash-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .dash-table thead { background: var(--bg-card); }
+
+    .dash-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .dash-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-dim);
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .dash-table tr:last-child td { border-bottom: none; }
+
+    .dash-table td.skill-name {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .dash-table td.num {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .dash-table td.date-cell {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+    }
+
+    /* Verdict pills */
+    .verdict {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 2px 9px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .verdict-keep    { background: rgba(158,206,106,0.15); color: var(--green);  border: 1px solid rgba(158,206,106,0.25); }
+    .verdict-review  { background: rgba(224,175,104,0.15); color: var(--yellow); border: 1px solid rgba(224,175,104,0.25); }
+    .verdict-delete  { background: rgba(247,118,142,0.15); color: var(--red);    border: 1px solid rgba(247,118,142,0.25); }
+
+    /* Source pills */
+    .sources { display: flex; gap: 4px; flex-wrap: wrap; }
+
+    .source-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 7px;
+      border-radius: 3px;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      white-space: nowrap;
+    }
+
+    .source-pill.global  { color: var(--accent);  border-color: var(--accent-dim);  background: var(--accent-glow); }
+    .source-pill.project { color: var(--purple);  border-color: rgba(187,154,247,0.3); background: rgba(187,154,247,0.08); }
+    .source-pill.codex   { color: var(--cyan);    border-color: rgba(125,207,255,0.3); background: rgba(125,207,255,0.08); }
+
+    /* ─── Verdict cards ──────────────────────────────────────────── */
+    .verdict-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .verdict-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+
+    .verdict-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .verdict-card-rule {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .verdict-card-rule strong {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      display: block;
+      margin-top: 6px;
+      color: var(--text-muted);
+    }
+
+    /* ─── Install section ────────────────────────────────────────── */
+    .install-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .code-block {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .code-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-block-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .copy-btn {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      cursor: pointer;
+      transition: color var(--transition), border-color var(--transition);
+    }
+
+    .copy-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
+    .copy-btn.copied { color: var(--green); border-color: rgba(158,206,106,0.4); }
+
+    pre {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+      padding: 16px;
+      overflow-x: auto;
+      color: var(--text-dim);
+    }
+
+    pre .comment { color: var(--text-muted); }
+    pre .cmd     { color: var(--text); }
+    pre .arg     { color: var(--cyan); }
+    pre .kw      { color: var(--accent); }
+
+    /* ─── Archive section ────────────────────────────────────────── */
+    .archive-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .archive-prose { color: var(--text-dim); line-height: 1.75; }
+
+    .archive-prose p + p { margin-top: 12px; }
+
+    .archive-prose ul {
+      padding-left: 18px;
+      margin-top: 10px;
+    }
+
+    .archive-prose li {
+      margin-bottom: 6px;
+      color: var(--text-dim);
+    }
+
+    /* ─── Footer ─────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 0;
+    }
+
+    .footer-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-left {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .footer-right {
+      display: flex;
+      gap: 20px;
+      font-size: 13px;
+    }
+
+    .footer-right a { color: var(--text-muted); }
+    .footer-right a:hover { color: var(--accent); text-decoration: none; }
+
+    /* ─── Responsive ─────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      section { padding: 48px 0; }
+
+      .hero { padding: 60px 0 48px; }
+
+      .install-grid { grid-template-columns: 1fr; }
+
+      .verdict-grid { grid-template-columns: 1fr; }
+
+      .archive-grid { grid-template-columns: 1fr; }
+
+      .nav-links { display: none; }
+
+      .hero-meta { gap: 20px; }
+
+      .hero-ctas { gap: 10px; }
+
+      /* Force dash table scroll on mobile */
+      .dash-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+      .dashboard-topbar { gap: 6px; flex-wrap: wrap; }
+    }
+
+    @media (max-width: 375px) {
+      .wrap { padding: 0 16px; }
+
+      h1 { font-size: 24px; }
+
+      pre { font-size: 11.5px; padding: 12px; }
+
+      .btn { font-size: 13px; padding: 8px 16px; }
+    }
+
+    /* ─── Misc utilities ─────────────────────────────────────────── */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label::before {
+      content: "";
+      display: inline-block;
+      width: 16px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    .spacer-sm { margin-top: 12px; }
+    .spacer-md { margin-top: 20px; }
+    .spacer-lg { margin-top: 32px; }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Navigation ──────────────────────────────────────────── -->
+  <nav>
+    <div class="nav-inner">
+      <a class="nav-brand" href="#">skill-<span>usage-stats</span></a>
+      <ul class="nav-links">
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#what-gets-counted">Counting</a></li>
+        <li><a href="#dashboard">Dashboard</a></li>
+        <li><a href="#verdicts">Verdicts</a></li>
+        <li><a href="#install">Install</a></li>
+        <li><a href="#archive">Archive</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ─── Hero ────────────────────────────────────────────────── -->
+  <section class="hero" id="hero">
+    <div class="wrap">
+      <div class="hero-eyebrow">open-source &middot; Python 3.10+ &middot; MIT</div>
+      <h1>Audit your Claude Code<br>skill catalog.</h1>
+      <p class="hero-tagline">
+        Two stdlib-only Python skills that scan your local transcripts, reconcile
+        invocations against your on-disk skill catalog, and tell you exactly which
+        skills you use, when you last used them, and which are safe to archive.
+      </p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="https://github.com/cskwork/skill-usage-stats" target="_blank" rel="noopener">
+          View on GitHub
+        </a>
+        <a class="btn btn-secondary" href="#install">
+          Install
+        </a>
+      </div>
+      <div class="hero-meta">
+        <div class="hero-meta-item">
+          <span class="hero-meta-label">Runtime</span>
+          <span class="hero-meta-value">stdlib only, no dependencies</span>
+        </div>
+        <div class="hero-meta-item">
+          <span class="hero-meta-label">Platforms</span>
+          <span class="hero-meta-value">macOS / Linux / Windows</span>
+        </div>
+        <div class="hero-meta-item">
+          <span class="hero-meta-label">Network</span>
+          <span class="hero-meta-value">offline, no telemetry</span>
+        </div>
+        <div class="hero-meta-item">
+          <span class="hero-meta-label">License</span>
+          <span class="hero-meta-value">MIT</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Problem ─────────────────────────────────────────────── -->
+  <section class="problem" id="problem">
+    <div class="wrap">
+      <div class="section-label">The problem</div>
+      <h2>Your skill catalog grows faster than it gets cleaned up.</h2>
+      <p>
+        After installing dozens of marketplace skills, plugins, and personal scripts,
+        the catalog becomes noisy. The core difficulty is that
+        auto-triggered skills load through <code>Read</code> or shell access to
+        <code>SKILL.md</code> — not always through the explicit <code>Skill</code>
+        tool — so a simple grep of your transcript history undercounts invocations.
+        Both skills in this repo scan every Claude Code transcript
+        (<code>~/.claude/projects/**/*.jsonl</code>) and Codex session
+        (<code>~/.codex/sessions/**/*.jsonl</code>), detect all six invocation
+        patterns, and reconcile the results against your on-disk catalog: global,
+        project, plugin (marketplace + cache), Codex skills, and Codex prompts.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─── What gets counted ───────────────────────────────────── -->
+  <section id="what-gets-counted">
+    <div class="wrap">
+      <div class="section-label">Detection</div>
+      <h2>What gets counted</h2>
+      <p>Each event credits the skill once. Same-named skills across sources are merged into one row with summed counts.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Pattern detected</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Claude Code explicit</td>
+              <td class="pattern">tool_use with name="Skill", input.skill=&lt;name&gt;</td>
+            </tr>
+            <tr>
+              <td>Claude Code slash command</td>
+              <td class="pattern">&lt;command-name&gt;/name&lt;/command-name&gt; in user messages only</td>
+            </tr>
+            <tr>
+              <td>Claude Code auto-trigger</td>
+              <td class="pattern">Read of */skills/&lt;name&gt;/SKILL.md</td>
+            </tr>
+            <tr>
+              <td>Claude Code shell auto-trigger</td>
+              <td class="pattern">Bash command containing */skills/&lt;name&gt;/SKILL.md</td>
+            </tr>
+            <tr>
+              <td>Codex slash command</td>
+              <td class="pattern">User input_text whose first line is /name</td>
+            </tr>
+            <tr>
+              <td>Codex auto-trigger</td>
+              <td class="pattern">function_call(exec_command/shell) arguments containing */skills/&lt;name&gt;/SKILL.md</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Dashboard preview ───────────────────────────────────── -->
+  <section id="dashboard">
+    <div class="wrap">
+      <div class="section-label">Preview</div>
+      <h2>Generated HTML dashboard</h2>
+      <p>
+        Running <code>analyze.py</code> writes a self-contained HTML file you can
+        sort, filter, and export. The mock below shows representative rows across all
+        three verdict states.
+      </p>
+      <div class="dashboard-preview spacer-md">
+        <div class="dashboard-topbar">
+          <span class="dashboard-topbar-label">skill-stats.html &mdash; 31 skills found</span>
+          <span style="flex:1"></span>
+          <span class="filter-pill active">all</span>
+          <span class="filter-pill">keep</span>
+          <span class="filter-pill">review</span>
+          <span class="filter-pill">delete</span>
+          <span class="filter-pill">zero-use</span>
+        </div>
+        <div class="dash-table-wrap">
+          <table class="dash-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Verdict</th>
+                <th>Sources</th>
+                <th style="text-align:right">Count</th>
+                <th style="text-align:right">Sessions</th>
+                <th>Last used</th>
+                <th style="text-align:right">Days since</th>
+                <th style="text-align:right">Size (KB)</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="skill-name">tdd</td>
+                <td><span class="verdict verdict-keep">KEEP</span></td>
+                <td>
+                  <div class="sources">
+                    <span class="source-pill global">global</span>
+                  </div>
+                </td>
+                <td class="num">48</td>
+                <td class="num">19</td>
+                <td class="date-cell">2026-05-21</td>
+                <td class="num">5</td>
+                <td class="num">3.1</td>
+                <td style="color:var(--text-muted);font-size:11.5px">TDD workflow: red, green, refactor loop</td>
+              </tr>
+              <tr>
+                <td class="skill-name">brainstorming</td>
+                <td><span class="verdict verdict-keep">KEEP</span></td>
+                <td>
+                  <div class="sources">
+                    <span class="source-pill global">global</span>
+                    <span class="source-pill project">project</span>
+                  </div>
+                </td>
+                <td class="num">31</td>
+                <td class="num">14</td>
+                <td class="date-cell">2026-05-24</td>
+                <td class="num">2</td>
+                <td class="num">2.4</td>
+                <td style="color:var(--text-muted);font-size:11.5px">Explores intent and requirements before implementation</td>
+              </tr>
+              <tr>
+                <td class="skill-name">code-review</td>
+                <td><span class="verdict verdict-keep">KEEP</span></td>
+                <td>
+                  <div class="sources">
+                    <span class="source-pill global">global</span>
+                  </div>
+                </td>
+                <td class="num">22</td>
+                <td class="num">11</td>
+                <td class="date-cell">2026-05-18</td>
+                <td class="num">8</td>
+                <td class="num">4.7</td>
+                <td style="color:var(--text-muted);font-size:11.5px">Review current diff for correctness bugs</td>
+              </tr>
+              <tr>
+                <td class="skill-name">deep-dive</td>
+                <td><span class="verdict verdict-review">REVIEW</span></td>
+                <td>
+                  <div class="sources">
+                    <span class="source-pill global">global</span>
+                  </div>
+                </td>
+                <td class="num">3</td>
+                <td class="num">3</td>
+                <td class="date-cell">2026-02-14</td>
+                <td class="num">101</td>
+                <td class="num">1.8</td>
+                <td style="color:var(--text-muted);font-size:11.5px">Deep-dive research loop with evaluator</td>
+              </tr>
+              <tr>
+                <td class="skill-name">wiki-ingest</td>
+                <td><span class="verdict verdict-review">REVIEW</span></td>
+                <td>
+                  <div class="sources">
+                    <span class="source-pill global">global</span>
+                    <span class="source-pill codex">codex</span>
+                  </div>
+                </td>
+                <td class="num">0</td>
+                <td class="num">0</td>
+                <td class="date-cell">&mdash;</td>
+                <td class="num">&mdash;</td>
+                <td class="num">6.2</td>
+                <td style="color:var(--text-muted);font-size:11.5px">Add new sources to wiki pages</td>
+              </tr>
+              <tr>
+                <td class="skill-name">pptx-design-styles</td>
+                <td><span class="verdict verdict-delete">DELETE</span></td>
+                <td>
+                  <div class="sources">
+                    <span class="source-pill global">global</span>
+                  </div>
+                </td>
+                <td class="num">1</td>
+                <td class="num">1</td>
+                <td class="date-cell">2025-10-03</td>
+                <td class="num">235</td>
+                <td class="num">9.1</td>
+                <td style="color:var(--text-muted);font-size:11.5px">PowerPoint design style reference</td>
+              </tr>
+              <tr>
+                <td class="skill-name">reddit-poster</td>
+                <td><span class="verdict verdict-delete">DELETE</span></td>
+                <td>
+                  <div class="sources">
+                    <span class="source-pill project">project</span>
+                  </div>
+                </td>
+                <td class="num">0</td>
+                <td class="num">0</td>
+                <td class="date-cell">&mdash;</td>
+                <td class="num">&mdash;</td>
+                <td class="num">2.0</td>
+                <td style="color:var(--text-muted);font-size:11.5px">Post to Reddit via MCP server</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Verdict logic ───────────────────────────────────────── -->
+  <section id="verdicts">
+    <div class="wrap">
+      <div class="section-label">Classification</div>
+      <h2>Verdict logic</h2>
+      <p>Each skill is classified once, at report generation time, based on count and recency.</p>
+      <div class="verdict-grid spacer-md">
+        <div class="verdict-card">
+          <div class="verdict-card-header">
+            <span class="verdict verdict-keep">KEEP</span>
+          </div>
+          <div class="verdict-card-rule">
+            The skill has been invoked at least once and was last used within 90 days.
+            <strong>count &gt; 0 and days_since &le; 90</strong>
+          </div>
+        </div>
+        <div class="verdict-card">
+          <div class="verdict-card-header">
+            <span class="verdict verdict-review">REVIEW</span>
+          </div>
+          <div class="verdict-card-rule">
+            Never used but installed within the last 60 days, or used but last seen
+            between 91 and 180 days ago.
+            <strong>(count = 0 and install_age &le; 60) or (days_since &le; 180)</strong>
+          </div>
+        </div>
+        <div class="verdict-card">
+          <div class="verdict-card-header">
+            <span class="verdict verdict-delete">DELETE</span>
+          </div>
+          <div class="verdict-card-rule">
+            Never used and installed over 60 days ago, or last used more than 180 days ago.
+            <strong>(count = 0 and install_age &gt; 60) or (days_since &gt; 180)</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Install ─────────────────────────────────────────────── -->
+  <section id="install">
+    <div class="wrap">
+      <div class="section-label">Install</div>
+      <h2>Install</h2>
+      <p>
+        Clone the repo and copy the skill directories into your
+        <code>~/.claude/skills/</code> folder. No package manager, no dependencies.
+      </p>
+      <div class="install-grid">
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-title">macOS / Linux</span>
+            <button class="copy-btn" data-target="mac-code">copy</button>
+          </div>
+          <pre id="mac-code"><span class="comment"># clone</span>
+<span class="cmd">git clone</span> <span class="arg">https://github.com/cskwork/skill-usage-stats.git</span>
+<span class="cmd">cd</span> <span class="arg">skill-usage-stats</span>
+
+<span class="comment"># install both skills</span>
+<span class="cmd">cp -R</span> <span class="arg">skills/skill-usage-stats</span> <span class="kw">~/.claude/skills/</span>
+<span class="cmd">cp -R</span> <span class="arg">skills/skill-cleanup</span>     <span class="kw">~/.claude/skills/</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-title">Windows (PowerShell)</span>
+            <button class="copy-btn" data-target="win-code">copy</button>
+          </div>
+          <pre id="win-code"><span class="comment"># clone</span>
+<span class="cmd">git clone</span> <span class="arg">https://github.com/cskwork/skill-usage-stats.git</span>
+<span class="cmd">cd</span> <span class="arg">skill-usage-stats</span>
+
+<span class="comment"># install both skills</span>
+<span class="cmd">Copy-Item -Recurse</span> <span class="arg">skills/skill-usage-stats</span> <span class="kw">$HOME\.claude\skills\</span>
+<span class="cmd">Copy-Item -Recurse</span> <span class="arg">skills/skill-cleanup</span>     <span class="kw">$HOME\.claude\skills\</span></pre>
+        </div>
+      </div>
+      <div class="spacer-lg">
+        <h3>Run the analyzer</h3>
+        <div class="code-block" style="max-width:560px">
+          <div class="code-block-header">
+            <span class="code-block-title">analyze.py</span>
+            <button class="copy-btn" data-target="run-code">copy</button>
+          </div>
+          <pre id="run-code"><span class="comment"># generate and open the HTML dashboard</span>
+<span class="cmd">python3</span> <span class="arg">~/.claude/skills/skill-usage-stats/analyze.py</span>
+
+<span class="comment"># optional flags</span>
+<span class="comment">#   --days N           only count last N days</span>
+<span class="comment">#   --project &lt;str&gt;   restrict to matching cwd</span>
+<span class="comment">#   --out &lt;path&gt;      output path (default: ~/.claude/skill-stats.html)</span>
+<span class="comment">#   --no-open         write only, do not open browser</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Archive workflow ─────────────────────────────────────── -->
+  <section id="archive">
+    <div class="wrap">
+      <div class="section-label">skill-cleanup</div>
+      <h2>Archive workflow</h2>
+      <div class="archive-grid">
+        <div class="archive-prose">
+          <p>
+            <code>skill-cleanup</code> never deletes skills. It moves each archived
+            skill directory under
+            <code>~/.claude/skills-archive/&lt;source&gt;/&lt;name&gt;/</code> and
+            renames <code>SKILL.md</code> to <code>SKILL.md.archived</code>. Because
+            the Claude Code harness discovers skills only by locating
+            <code>SKILL.md</code>, the renamed file stops being auto-loaded while
+            every other file remains intact and recoverable.
+          </p>
+          <p>
+            A <code>.archived-meta.json</code> file is written next to each archived
+            skill recording the original path, archive date, and the stats-report
+            reason. The tool refuses to operate on
+            <code>~/.claude/plugins/cache/...</code> paths, which are managed by the
+            marketplace and would be re-installed automatically.
+          </p>
+          <p>
+            By default the tool runs in dry-run mode and prints a preview of every
+            move. Pass <code>--apply</code> to commit. Restore any skill with a single
+            command.
+          </p>
+        </div>
+        <div>
+          <div class="code-block">
+            <div class="code-block-header">
+              <span class="code-block-title">archive.py</span>
+              <button class="copy-btn" data-target="archive-code">copy</button>
+            </div>
+            <pre id="archive-code"><span class="comment"># dry-run by default — preview only</span>
+<span class="cmd">python3</span> <span class="arg">~/.claude/skills/skill-cleanup/archive.py</span>
+
+<span class="comment"># commit the moves</span>
+<span class="cmd">python3</span> <span class="arg">~/.claude/skills/skill-cleanup/archive.py</span> <span class="kw">--apply</span>
+
+<span class="comment"># also archive REVIEW-verdict skills older than 90d</span>
+<span class="cmd">python3</span> <span class="arg">~/.claude/skills/skill-cleanup/archive.py</span> \
+        <span class="kw">--verdict</span> <span class="arg">DELETE,REVIEW</span> <span class="kw">--days</span> <span class="arg">90</span> <span class="kw">--apply</span>
+
+<span class="comment"># restrict to one source</span>
+<span class="cmd">python3</span> <span class="arg">~/.claude/skills/skill-cleanup/archive.py</span> \
+        <span class="kw">--source</span> <span class="arg">claude-project</span> <span class="kw">--apply</span>
+
+<span class="comment"># list archived skills</span>
+<span class="cmd">python3</span> <span class="arg">~/.claude/skills/skill-cleanup/archive.py</span> <span class="kw">list-archive</span>
+
+<span class="comment"># restore a skill</span>
+<span class="cmd">python3</span> <span class="arg">~/.claude/skills/skill-cleanup/archive.py</span> <span class="kw">restore</span> <span class="arg">reddit-poster</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Footer ───────────────────────────────────────────────── -->
+  <footer>
+    <div class="footer-inner">
+      <span class="footer-left">skill-usage-stats &mdash; MIT License</span>
+      <div class="footer-right">
+        <a href="https://github.com/cskwork/skill-usage-stats" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/cskwork/skill-usage-stats/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+        <a href="https://github.com/cskwork/skill-usage-stats/blob/main/README.md" target="_blank" rel="noopener">README</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Copy-to-clipboard for code blocks only
+    document.querySelectorAll('.copy-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var targetId = btn.getAttribute('data-target');
+        var pre = document.getElementById(targetId);
+        if (!pre) return;
+        var text = pre.innerText;
+        navigator.clipboard.writeText(text).then(function() {
+          btn.textContent = 'copied';
+          btn.classList.add('copied');
+          setTimeout(function() {
+            btn.textContent = 'copy';
+            btn.classList.remove('copied');
+          }, 2000);
+        }).catch(function() {
+          // fallback: select text
+          var range = document.createRange();
+          range.selectNodeContents(pre);
+          window.getSelection().removeAllRanges();
+          window.getSelection().addRange(range);
+        });
+      });
+    });
+  </script>
+
+</body>
+</html>
