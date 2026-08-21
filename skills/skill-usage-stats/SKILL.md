@@ -1,17 +1,11 @@
 ---
 name: skill-usage-stats
-description: Generate an HTML dashboard of skill usage across Claude Code and Codex (global + project .claude/skills, ~/.codex/skills, ~/.codex/prompts). Counts invocations, last-used date, days-since-use, session reach, and on-disk size so you can decide which skills to keep, archive, or delete. Triggers — "skill usage stats", "which skills do I actually use", "clean up skills", "audit my skills", "스킬 사용 통계", "안 쓰는 스킬", "스킬 정리".
+description: Generate an HTML dashboard of skill usage across Claude Code and Codex (global + project .claude/skills, ~/.claude/plugins, ~/.codex/skills, ~/.codex/prompts). Triggers — "skill usage stats", "which skills do I actually use", "audit my skills", "스킬 사용 통계".
 ---
 
 # Skill Usage Stats
 
 Scans local Claude Code (`~/.claude/projects/**/*.jsonl`) and Codex (`~/.codex/sessions/**/*.jsonl`) transcripts, joins against the installed skill/prompt catalog, and writes an interactive HTML dashboard to `~/.claude/skill-stats.html`.
-
-## When to use
-
-- User asks which skills they actually use, or wants to clean up unused skills.
-- User wants a usage report comparing global vs. project-level skills.
-- User mentions auditing Claude Code or Codex skills.
 
 ## Files in this skill
 
@@ -59,11 +53,15 @@ Each `tool_use` / `function_call` event credits the skill once. Source is decide
 **Catalog sources** (where the SKILL.md lives on disk):
 - `claude-global`: `~/.claude/skills/*/SKILL.md`
 - `claude-project`: `<repo>/.claude/skills/*/SKILL.md` (discovered from transcript cwds)
+- `claude-plugin`: `~/.claude/plugins/**/skills/*/SKILL.md` (marketplaces + cache)
 - `codex-global-skill`: `~/.codex/skills/*/SKILL.md`
 - `codex-global-prompt`: `~/.codex/prompts/*.md`
 
-## Output columns
+## Dashboard
 
-`name | source | count | sessions | first_used | last_used | days_since | size_kb | path`
+Columns: `name | verdict | sources | count | sessions | last used | days since | size (KB) | description`. Sortable; filter by source, verdict, zero-use, or stale. Zero-use and >90d rows are highlighted.
 
-Sortable, filterable. Stale skills (>90 days unused) and zero-use skills are highlighted.
+`verdict` carries a one-line reason and is what `skill-cleanup` archives on:
+- `KEEP` — used within 90 days, or never used but installed ≤30 days ago.
+- `REVIEW` — never used and installed 31–60 days ago, or last used 91–180 days ago.
+- `DELETE` — never used and installed >60 days ago, or last used >180 days ago.

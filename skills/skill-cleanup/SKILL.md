@@ -1,6 +1,6 @@
 ---
 name: skill-cleanup
-description: Archive (not delete) Claude Code and Codex skills that are zero-use or stale (>90 days unused) based on a generated skill-stats.html report. Renames the SKILL.md inside each archived directory so agents stop discovering them, while keeping all content recoverable. Triggers — "clean up skills", "archive unused skills", "스킬 정리", "안 쓰는 스킬 정리", "skill archive".
+description: Archive (not delete) Claude Code and Codex skills that are zero-use or stale, based on a generated skill-stats.html report, keeping every file recoverable. Triggers — "clean up skills", "archive unused skills", "스킬 정리", "안 쓰는 스킬 정리".
 ---
 
 # Skill Cleanup
@@ -15,7 +15,9 @@ For each chosen skill directory:
 2. Inside the archived directory, rename `SKILL.md` → `SKILL.md.archived` so the harness no longer treats it as an active skill (the harness only auto-discovers `SKILL.md`).
 3. Write a `.archived-meta.json` next to it recording original path, archive date, and the reason from the stats report.
 
-Reverse: `restore <name>` moves it back and renames `SKILL.md.archived` → `SKILL.md`.
+Single-file prompts (`~/.codex/prompts/<name>.md`) get a wrapper directory instead: `~/.codex/skills-archive/codex-global-prompt/<name>/<name>.md.archived` plus the same `.archived-meta.json`.
+
+Reverse: `restore <name>` moves it back, renaming `SKILL.md.archived` → `SKILL.md` (or `<name>.md.archived` → `<name>.md` for a prompt).
 
 ## How to run
 
@@ -30,11 +32,10 @@ python3 ~/.claude/skills/skill-cleanup/archive.py
 python3 ~/.claude/skills/skill-cleanup/archive.py --apply
 
 # Useful flags
-#   --verdict DELETE       only archive DELETE-classified skills (default)
+#   --verdict DELETE       default; DELETE = never used and installed >60d, or last used >180d
 #   --verdict DELETE,REVIEW
 #   --days 90              also archive count>0 but stale >N days
 #   --source claude-global only archive from one source
-#   --dry-run              never actually move (default)
 
 # Restore
 python3 ~/.claude/skills/skill-cleanup/archive.py restore <name>
@@ -43,7 +44,7 @@ python3 ~/.claude/skills/skill-cleanup/archive.py list-archive
 
 ## Safety
 
-- Default mode is dry-run.
-- Never deletes; archive is fully reversible.
+- Dry-run by default; never deletes; archive is fully reversible.
 - Skips any skill not in the stats report (so you can't accidentally archive an unscanned skill).
+- Skips symlinked skill directories, reporting each as `symlink (not archiving)` — a symlinked catalog stays untouched.
 - Refuses to operate on plugin cache paths (`~/.claude/plugins/cache/...`) — those are managed by the plugin marketplace and a rename there would just be re-installed.
