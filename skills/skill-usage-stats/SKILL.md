@@ -39,7 +39,7 @@ python3 ~/.claude/skills/skill-usage-stats/summary.py stale --days 90  # >90d un
 
 ## Detection rules
 
-Covers **both explicit slash-command calls and auto-triggered loads** (the harness loads SKILL.md on its own when a description matches user intent).
+Counts explicit calls and observed load-like path references in the supported transcript formats. File reads/edits can be inspection rather than invocation; missing events, retention gaps, or unsupported harness formats can undercount. Treat counts as observed signals, not universal usage telemetry.
 
 - **Claude Code — explicit `Skill` tool**: `tool_use` with `name="Skill"`, `input.skill=<name>`.
 - **Claude Code — slash command**: `<command-name>/name</command-name>` tag in user messages.
@@ -61,7 +61,7 @@ Each `tool_use` / `function_call` event credits the skill once. Source is decide
 
 Columns: `name | verdict | sources | count | sessions | last used | days since | size (KB) | description`. Sortable; filter by source, verdict, zero-use, or stale. Zero-use and >90d rows are highlighted.
 
-`verdict` carries a one-line reason and is what `skill-cleanup` archives on:
+`verdict` carries a heuristic reason for review, not authorization to archive:
 - `KEEP` — used within 90 days, or never used but installed ≤30 days ago.
 - `REVIEW` — never used and installed 31–60 days ago, or last used 91–180 days ago.
 - `DELETE` — never used and installed >60 days ago, or last used >180 days ago.

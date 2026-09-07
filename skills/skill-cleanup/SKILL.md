@@ -44,7 +44,8 @@ python3 ~/.claude/skills/skill-cleanup/archive.py list-archive
 
 ## Safety
 
-- Dry-run by default; never deletes; archive is fully reversible.
+- Dry-run by default. A broad cleanup request produces a review; apply only the user-authorized selection. Recorded zero use is not proof of universal non-use.
+- Archives preserve contents and metadata; check restore destinations for conflicts before claiming reversibility.
 - Skips any skill not in the stats report (so you can't accidentally archive an unscanned skill).
 - Skips symlinked skill directories, reporting each as `symlink (not archiving)` — a symlinked catalog stays untouched.
 - Refuses to operate on plugin cache paths (`~/.claude/plugins/cache/...`) — those are managed by the plugin marketplace and a rename there would just be re-installed.
